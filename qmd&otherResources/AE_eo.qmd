@@ -1,0 +1,583 @@
+---
+title: "ANÁLISIS EXPLORATORIO DE 100 EMPRESAS EÓLICAS ESPAÑOLAS"
+author: "Ramírez Guijarro, Marta"
+toc: true
+toc-title: "ÍNDICE"
+toc-location: body
+lot: true
+lof: true
+format: pdf
+editor: visual
+editor_options: 
+  chunk_output_type: console
+  number-sections: false
+papersize: a4 
+fontsize: 11pt
+fontfamily: libertinus
+linestretch: 1.5
+geometry:
+  - top=3cm
+  - bottom=3cm
+  - right=3cm
+  - left=3cm
+header-includes:
+  - \usepackage{titling}
+  - \pretitle{\begin{center}
+  - \includegraphics[width=5in,height=7in]{molinos.jpeg}\LARGE\\}
+  - \posttitle{\end{center}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+\pagebreak
+
+## 1. INTRODUCCIÓN
+
+El presente proyecto se basa en el análisis de una base de datos extraída de la plataforma SABI, la cual contiene información económica correspondiente a empresas eólicas de España, dicha información está recogida en las siguientes variables (Table 1).
+
+| VARIABLE (atributo) |            DESCRIPCIÓN            |    OBSERVACIONES     |
+|:-------------------|:------------------------------:|:-------------------:|
+| RENECO              |    Rentabilidad económica (%)     |  Numérica: continua  |
+| RENFIN              |    Rentabilidad financiera (%)    |  Numérica: continua  |
+| LIQUIDEZ            |       Liquidez general (%)        |  Numérica: continua  |
+| ENDEUDA             |         Endeudamiento (%)         |  Numérica: continua  |
+| ACTIVO              |      Total Activo (mil EUR)       |  Numérica: continua  |
+| FPIOS               |     Fondos propios (mil EUR)      |  Numérica: continua  |
+| RES                 | Resultado del Ejercicio (mil EUR) |  Numérica: continua  |
+| MARGEN              |      Margen de beneficio (%)      |  Numérica: continua  |
+| SOLVENCIA           |   Coeficiente de solvencia (%)    |  Numérica: continua  |
+| APALANCA            |        Apalancamiento (%)         |  Numérica: continua  |
+| DIMENSIÓN           |      Grande, Medio, Pequeño       |  Numérica: discreta  |
+| MATRIZ              |           GUO - Nombre            | Cualitativa: nominal |
+
+: Relación de variables y descripción
+
+## 2. PROCEDIMIENTOS PREVIOS AL ANÁLISIS
+
+En primer lugar, se importará la base de datos anteriormente mencionada al software Rstudio.
+
+```{r Lectura documento xlxs}
+
+rm(list = ls())
+
+library(readxl)
+
+eolicas <- read_excel("eolica_100_mv.xlsx", sheet = "Datos")
+```
+
+Una vez importada la base de datos, se muestran los estadísticos básicos de todas las variables anteriormente mencionadas (Table 2).
+
+```{r Estadísticos básicos}
+
+library(printr)
+library(kableExtra)
+
+#Asignar la primera columna como nombre de fila
+
+eolicas <- data.frame(eolicas, row.names = 1)
+
+knitr::kables(list(kable(summary (eolicas[1:5])),
+                   kable(summary (eolicas[6:10])),
+                   kable(summary (eolicas[11:12]))), 
+                   caption = "Estadísticos básicos") %>% 
+  kableExtra::kable_classic() %>%
+  kableExtra::row_spec(0, bold = T, color = "black", 
+                       background = "#F1FaEE", align = "c") %>%
+  kableExtra::row_spec(8, bold = T, color = "black", 
+                       background = "#F1FaEE", align = "c") %>%
+  kableExtra::row_spec(16, bold = T, color = "black", 
+                       background = "#F1FaEE", align = "c") %>%
+  kableExtra::kable_styling(full_width = F, 
+                            latex_options = c("basic", "HOLD_position"), 
+                            position = "center", font_size = 10)
+
+```
+
+Así, en la Table 2 se pueden observar los estadísticos básicos de las variables como, por ejemplo, la rentabilidad económica media, la rentabilidad financiera media, la liquidez media mantenida, el endeudamiento medio, el número de empleados medio, los activos medios, los fondos propios medios, el resultado medio, los ingresos medios, el margen medio, la solvencia media, el grado de apalancamiento medio y el número de accionistas medio, entre otros.
+Cabe destacar que para las variables nominales estos estadísticos básicos no son válidos.
+
+Dado que para realizar muchas de las Técnicas de Análisis Multivariantes (en adelante TAM) de tipo paramétrico es necesario que las variables implicadas sigan una distribución normal, se procederá en epígrafes posteriores a la comprobación de la normalidad de las variables analizadas.
+Además, para que los resultados de las TAM sean plenamente confiables y no se vean alterados o invalidados, es necesario comprobar la existencia de observaciones "raras" o *outliers*.
+Pues estos suelen alterar la normalidad de las variables o afectar a los resultados de los análisis, por lo que en caso de existir es recomendable evaluar su eliminación de la muestra o su conservación.
+Paralelamente, también se comprobará la existencia de *valores perdidos* o *missing values* para, en caso de existir, proceder a su eliminación o imputación de un valor discrecional, pues estos impedirán la correcta realización de los análisis pertinentes.
+
+## 3. ANÁLISIS DE LA VARIABLE *ENDEUDA*
+
+La primera variable que se va a analizar es `ENDEUDA`, para ello, en primer lugar, se va a proceder a la comprobación de la existencia de *missing values*.
+
+### 3.1. TRATAMIENTO DE *MISSING VALUES*
+
+Como ya se ha comentado, la existencia de valores perdidos dificulta e incluso impide el correcto análisis de las variables, por ello, a continuación, se va a proceder a comprobar la existencia de valores perdidos (en la Table 3 se puede observar como la mayoría de las variables los presentan) a través de un gráfico.
+
+```{r, fig.show='asis', fig.align='center', fig.cap='Valores perdidos'}
+
+library(visdat)
+library(ggplot2)
+library(ggthemes)
+
+vis_miss(eolicas) +
+  scale_color_manual(aesthetics = "fill", values = c("#F1FaEE", "#457b9d")) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, size = 10, hjust = 0, vjust = 1), 
+        axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+```
+
+A continuación, en la Table 3, se muestran las observaciones que presentan valores perdidos en la variable analizada `ENDEUDA`.
+
+```{r}
+library (dplyr)
+
+muestra<- select(eolicas, everything())
+
+knitr::kable(muestra %>% 
+               filter(is.na(ENDEUDA)) %>% 
+               select(ENDEUDA),
+             caption = "Valores perdidos de la variable ENDEUDA.") %>%
+    kableExtra::kable_classic() %>%
+    kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+```
+
+Así, existen dos empresas eólicas que no tienen datos de endeudamiento, por lo que, en este caso se va a proceder a la eliminación de dichas observaciones.
+Por ello, a partir de ahora se trabajará con 98 observaciones, en vez de con 100.
+
+```{r}
+muestra <- muestra %>% filter(! is.na(ENDEUDA))
+```
+
+Una vez eliminados los *missing values* de la variable `ENDEUDA`se presenta su representación gráfica a través de un histograma, lo que permitirá observar la distribución de dicha variable.
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO'}
+ggplot(data = muestra, map = aes(x = ENDEUDA)) +
+  geom_histogram(bins = 40, colour = "#457b9d", fill = "#457b9d", alpha = 0.7) +
+  geom_vline(xintercept = mean(muestra$ENDEUDA), 
+             color = "#1d3557", size = 1.2, alpha = 0.8) +
+  xlab("Endeudamiento (%)") +
+  ylab("Frecuencias") +  
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+```
+
+A priori, se puede observar como aparentemente la variable `ENDEUDA`no sigue una distribución normal, pues su histograma dista de asemejarse a la Campana de Gauss correspondiente.
+Pero dicha observación no es concluyente a través de simplemente un análisis gráfico como este, por ello más adelante se comprobará de forma más exhaustiva la normalidad de la variable.
+
+### 3.2. TRATAMIENTO DE *OUTLIERS*
+
+Tras eliminar los valores perdidos de la variable objeto de análisis resulta necesario determinar si existen observaciones "raras" o *outliers* que alteren la normalidad de esta o interfieran en los resultados de los análisis pertinentes.
+La forma más sencilla de comprobar si existen *outliers* a primera vista en una variable es a través de un gráfico de cajas como el mostrado en la Figure 3.
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO (%)'}
+library (ggplot2)
+
+ggplot(data = muestra, map = (aes(y = ENDEUDA))) +
+    geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+    ylab("Endeudamiento (%)") +
+   scale_color_manual(aesthetics = "fill", values = c("#457b9d", "#1d3557")) + 
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+```
+
+Así, se puede observar como la variable `ENDEUDA` no presenta valores atípicos a simple vista.
+Para asegurar dicho resultado a continuación se muestra el valor del primer cuantil y del tercero.
+
+Creando el objeto `Q1`en el que van a estar el 25% de los datos de la variable `ENDEUDA` (que está expresada en %) y en el objeto `Q3`el 75% de los datos.
+
+Obteniéndose que el 25% de las empresas eólicas tienen un endeudamiento del 50.85% y el 75% cuentan con un endeudamiento del 95.40%.
+
+```{r}
+Q1 <- quantile (muestra$ENDEUDA, c(0.25))
+Q3 <- quantile (muestra$ENDEUDA, c(0.75))
+table <- c(Q1, Q3)
+
+
+knitr::kable(table, col.names = c("Endeudamiento")) %>% 
+  kableExtra::kable_classic() %>%
+  kableExtra::row_spec(0, bold = T, color = "black", 
+                       background = "white", align = "c") %>%
+  kableExtra::kable_styling(full_width = F, 
+                            latex_options = c("basic", "HOLD_position"), 
+                            position = "center", font_size = 10)
+```
+
+A continuación, se mostrarán los *outliers* existentes, si es que los hay.
+Para ello, mostramos las observaciones mayores a $Q3 + 1.5·IQR$ y todos los valores menores a $Q1 - 1.5·IQR$.
+
+```{r}
+table2 <- muestra %>% filter(ENDEUDA > Q3 + 1.5*IQR(ENDEUDA) | 
+                               ENDEUDA < Q1 - 1.5*IQR(ENDEUDA), 
+                             na.rm = TRUE) %>% 
+  select(ENDEUDA)
+```
+
+```{r}
+knitr::kable(table2, caption = "Valores atípicos") %>% 
+  kableExtra::kable_classic() %>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+```
+
+Como se puede comprobar, la variable `ENDEUDA` no presenta valores atípicos.
+
+### 3.3. DESCRIPTIVOS BÁSICOS DE LA VARIABLE *ENDEUDA*
+
+Una vez eliminados los valores perdidos y comprobado que no existen *outliers* se presentan los estadísticos básicos de la variable `ENDEUDA`.
+
+```{r}
+library (summarytools)
+
+knitr::kable(descr(muestra$ENDEUDA,
+      stats = c("mean", "sd", "min", "q1", "med", "q3", "max", "iqr", "cv"),
+      transpose = FALSE,
+      style = "simple",
+      justify = "center",
+      headings = T), caption = "Estadísticos básicos de ENDEUDA") %>% 
+  kableExtra::kable_classic() %>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+```
+
+Donde se puede observar como el endeudamiento medio de las empresas eólicas analizadas es del 72.23% , siendo el menor endeudamiento presentado por las empresas eólicas analizadas un 0.92% y el máximo del 140.75%.
+A continuación, se muestra de nuevo la distribución de la variable `ENDEUDA` a través de su histograma, mostrándose también en este el endeudamiento medio.
+
+\pagebreak
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO'}
+ggplot(data = muestra, map = aes(x = ENDEUDA)) +
+  geom_histogram(bins = 40, colour = "#457b9d", fill = "#457b9d", alpha = 0.7) +
+  geom_vline(xintercept = mean(muestra$ENDEUDA), 
+             color = "#1d3557", size = 1.2, alpha = 0.8) +
+  xlab("Endeudamiento (%)") +
+  ylab("Frecuencias") +
+   theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+
+```
+
+En el histograma se aprecia como, aparentemente, `ENDEUDA` no sigue una distribución normal, tal y como ya se señaló anteriormente, pero de forma gráfica no se puede determinar con total seguridad, por lo que a continuación se presenta un análisis más detallado de la normalidad de `ENDEUDA`.
+También se puede observar como muchas de las empresas eólicas presentan ratios de endeudamiento entre la media y el 100%.
+
+### 3.4. ¿SIGUE *ENDEUDA* UNA DISTRIBUCIÓN NORMAL?: GRÁFICO QQ
+
+El primer análisis para comprobar la normalidad es gráfico, al igual que el histograma, este es el gráfico quantil-quantil.
+Donde se comparan los quantiles, sin *outliers*, de la muestra con los quantiles teóricos de una distribución normal.
+
+\pagebreak
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIEMTO: QQ-PLOT'}
+ggplot(data = muestra, aes(sample = ENDEUDA)) +
+  stat_qq(colour = "#457b9d") + 
+  stat_qq_line(colour = "#1d3557") +
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+```
+
+Con este análisis se observa como la variable `ENDEUDA` no parece presentar normalidad, pues en el extremo superior y en el centro la muestra se distancia mucho de la línea teórica.
+Como no se puede dar una conclusión sólida se realizará un contraste paramétrico.
+
+#### 3.4.1. PRUEBA DE SHAPIRO-WILK
+
+El contraste paramétrico para determinar la normalidad de una variable es el Test de Sahpiro-Wilk, el cual utiliza como hipótesis nula ($H_0$) que la muestra presenta normalidad.
+
+Así, realizando dicho test para la variable `ENDEUDA` se determina que esta no sigue una distribución normal, pues el p-valor resultante del test es inferior a 0.05, por lo que se rechaza $H_0$.
+
+```{r}
+shapiro.test(x = muestra$ENDEUDA)
+```
+
+## 4. ANÁLISIS DE LAS VARIABLES *ENDEUDA* Y *RENECO*
+
+A continuación se analizarán conjuntamente las variables `ENDEUDA` y `RENECO`, es decir, el endeudamiento y la rentabilidad económica.
+
+\pagebreak
+
+### 4.1. TRATAMIENTO DE *MISSING VALUES*
+
+En primer lugar, se comprobará la existencia de valores perdidos en dichas variables que nos dificulten el análisis.
+
+```{r}
+muestra2 <- select(eolicas, everything())
+
+knitr::kable(muestra2 %>% filter(is.na(ENDEUDA) | is.na(RENECO)) %>% 
+               select(ENDEUDA, RENECO), 
+             caption = "Valores perdidos en las variables ENDEUDA y RENECO") %>% 
+  kableExtra::kable_classic()%>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+
+```
+
+Tal y como se puede comprobar en la Table 6 ambas variables presentan valores perdidos.
+Por lo que estos van a ser eliminados, pasándose a tener 96 observaciones (en el `data frame` `muestra2`) en vez de 100.
+
+```{r}
+muestra2 <- muestra2 %>% filter(! is.na(ENDEUDA) & ! is.na(RENECO) )
+
+```
+
+### 4.2. TRATAMIENTO DE *OUTLIERS*
+
+Una vez eliminados los valores perdidos, se procederá a la localización y eliminación de los *outliers*, para poder realizar correctamente los análisis pertinentes.
+
+Dado que en este caso se está trabajando con dos variables, para detectar los posibles *outliers*, se realizará un gráfico de dispersión, donde se representaran `ENDEUDA` y `RENECO` al mismo tiempo.
+Ademas, también se presenta un gráfico de cajas de cada una de las variables objeto de análisis.
+
+\pagebreak
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO vs RENTABILIDAD ECONÓMICA'}
+dispersion <- ggplot(data = muestra2, map = (aes(x = ENDEUDA, y = RENECO))) + 
+              geom_point(colour = "#457b9d", size = 2, alpha = 0.5) + 
+              ggtitle("ENDEUDAMIENTO vs RENTABILIDAD ECONÓMICA") +
+              xlab("Endeudamiento (%)") + 
+              ylab("Rentabilidad Económica (%)") +
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+```
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO'}
+caja_ENDEUDA <- ggplot(data = muestra2, map = (aes(y = ENDEUDA))) +
+               geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+               ggtitle("ENDEUDAMIENTO") +
+               ylab("Endeudamiento (%)") +
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+```
+
+```{r, fig.show='asis', fig.align='center', fig.cap='RENTABILIDAD ECONÓMICA'}
+caja_RENECO <- ggplot(data = muestra2, map = (aes(y = RENECO))) +
+               geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+               ggtitle("RENTABILIDAD ECONÓMICA") +
+               ylab("Rentabilidad Económica (%)") +
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+```
+
+```{r, fig.show='asis', fig.align='center', fig.width=20, fig.height=15}
+library (patchwork)
+
+dispersion / (caja_ENDEUDA | caja_RENECO)
+```
+
+Tal y como se puede observar en los gráficos superiores, existen varias observaciones de las que cabe pensar que se tratan de *outliers* (por su distancia con la mayor densidad de la nube de puntos).
+Así, en el gráfico se puede comprobar la posible existencia de al menos 2 observaciones atípicas en la variable `RENECO`.
+
+Por lo que, se van a crear los objetos `Q1` (donde se mostrará el valor medio de cada variable en el primer quantil, donde estarán situadas el 25% de las empresas analizadas) y `Q3` (donde se mostrará el valor medio de cada variable en el tercer quantil, donde estarán situadas el 75% de las empresas analizadas) para cada una de las variables objeto de análisis.
+
+```{r}
+Q1_ENDEUDA <- quantile (muestra2$ENDEUDA, c(0.25))
+Q3_ENDEUDA <- quantile (muestra2$ENDEUDA, c(0.75))
+Q1_RENECO <- quantile (muestra2$RENECO, c(0.25))
+Q3_RENECO <- quantile (muestra2$RENECO, c(0.75))
+
+```
+
+A continuación, se muestran los *outliers* de ambas variables, es decir, las observaciones que presentan valores, para cada una de las variables analizadas, por encima del tercer quantil más 1.5 veces el rango intercualtílico ($Q3 + 1.5·IQR$) y por debajo del primer quantil menos 1.5 veces el rango intercualtílico ($Q1 - 1.5·IQR$).
+
+```{r}
+knitr::kable(muestra2 %>% 
+               filter(ENDEUDA > Q3_ENDEUDA + 1.5*IQR(ENDEUDA) | 
+                        ENDEUDA < Q1_ENDEUDA - 1.5*IQR(ENDEUDA) | 
+                        RENECO > Q3_RENECO + 1.5*IQR(RENECO) | 
+                        RENECO < Q1_RENECO - 1.5*IQR(RENECO)) %>% 
+               select(ENDEUDA, RENECO), 
+             caption = "Outliers de las variables ENDEUDA y RENECO") %>% 
+  kableExtra::kable_classic() %>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+
+```
+
+Así, el resultado obtenido es que existen dos *outliers* (tal y como se puede ver en la Table 7) que van a ser eliminados.
+Quedándose el `data frame` `muestra2_so` con 94 observaciones.
+
+```{r}
+muestra2_so <- muestra2 %>% 
+  filter(ENDEUDA <= Q3_ENDEUDA + 1.5*IQR(ENDEUDA) & 
+           ENDEUDA >= Q1_ENDEUDA - 1.5*IQR(ENDEUDA) & 
+           RENECO <= Q3_RENECO + 1.5*IQR(RENECO) & 
+           RENECO >= Q1_RENECO - 1.5*IQR(RENECO))
+
+```
+
+De esta forma, volviéndose a realizar el gráfico de dispersión se observa como la muestra ya no presenta tantos valores extremos, aunque es cierto que se pueden apreciar observaciones que se encuentran alejadas de la mayor densidad de observaciones, pero estas ya no serán tratadas como *outliers*.
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO vs RENTABILIDAD ECONÓMICA'}
+dispersion_so <- ggplot(data = muestra2_so, map = (aes(x = ENDEUDA, y = RENECO))) +
+  geom_point(colour = "#457b9d", size = 2, alpha = 0.5) +
+  ggtitle("ENDEUDAMIENTO vs RENTABILIDAD ECONÓMICA") +
+  xlab("Endeudamiento (%)") + 
+  ylab("Rentabilidad Económica (%)") +
+   theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+
+```
+
+```{r, fig.show='asis', fig.align='center', fig.cap='ENDEUDAMIENTO'}
+caja_ENDEUDA_so <- ggplot(data = muestra2_so, map = (aes(y = ENDEUDA))) +
+  geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+  ggtitle("ENDEUDAMIENTO") +
+  ylab("ENDEUDAMIENTO (%)") +
+   theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+
+```
+
+```{r, fig.show='asis', fig.align='center', fig.cap='RENECO'}
+caja_RENECO_so <- ggplot(data = muestra2_so, map = (aes(y = RENECO))) +
+  geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+  ggtitle("RENECO") +
+  ylab("Rentabilidad económica (%)") +
+   theme_minimal() +
+  theme(axis.title = element_text(color = "#495057", size = 25), 
+        plot.title = element_text(color ="#495057", size = 25))
+
+```
+
+```{r, fig.show='asis', fig.align='center', fig.width=20, fig.height=15}
+dispersion_so / (caja_ENDEUDA_so | caja_RENECO_so) +
+   theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+
+```
+
+\pagebreak
+
+## 5. ANÁLISIS DE LAS VARIABLES *ENDEUDA*, *RES*, *FPIOS*, Y *ACTIVO*
+
+A continuación, se analizarán las variables `ENDEUDA`, `RES`, `FPIOS` y `ACTIVO`, de la misma forma que anteriormente se han analizado otras, es decir, se analizará el endeudamiento, resultado, fondos propios y el activo de las empresas eólicas de la muestra.
+
+### 5.1. TRATAMIENTO DE *MISSING VALUES* Y *OUTLIERS*
+
+Así, tal y como se ha hecho anteriormente, se va a determinar si la nueva muestra de cuatro variables presenta valores perdidos.
+Los análisis pertinentes indican, tal y como se muestra en la Table 8, que hay varias observaciones que presentan *missing values* en las distintas variables objeto de análisis, por lo que se procederá a la eliminación de estas observaciones, por lo que a partir de ahora se trabajará con una muestra de 96 observaciones, en vez de con 100.
+
+```{r}
+muestra3<- select(eolicas, everything())
+knitr::kable(muestra3 %>% filter(is.na(ENDEUDA) | is.na(RES) | 
+                                   is.na(FPIOS) | is.na(ACTIVO)) %>% 
+               select(ENDEUDA, RES, FPIOS, ACTIVO), 
+             caption = "Valores perdidos de las variables ENDEUDA, RES, FPIOS y ACTIVO") %>% 
+  kableExtra::kable_classic() %>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 10)
+
+```
+
+```{r}
+muestra3 <- muestra3 %>% filter(! is.na(ENDEUDA) & 
+                                  ! is.na(RES) & ! is.na(FPIOS) & 
+                                  ! is.na(ACTIVO))
+
+```
+
+Como ya se ha hecho en apartados anteriores, tras la eliminación de los *missing values* es pertinente analizar si existen *outliers* que distorsionen el análisis.
+
+Dado que, en esta ocasión, se está trabajando con más de dos variables, no es posible realizar un gráfico de dispersión de las variables analizadas para observar de forma gráfica la existencia de valores atípicos.
+Por ello, dicho análisis se realizará a través de las distancias de Mahalanobis, que son las que se muestran en el Figure 6.
+De esta forma, a priori, se pueden identificar varias observaciones atípicas.
+
+\pagebreak
+
+```{r}
+muestra3.variables <- muestra3 %>% select(ENDEUDA, RES, FPIOS, ACTIVO)
+
+muestra3.maha <-mahalanobis(muestra3.variables,
+                           center = colMeans(muestra3.variables),
+                           cov = cov(muestra3.variables))
+
+muestra3 <- cbind(muestra3, muestra3.maha)
+
+```
+
+```{r, fig.show='asis', fig.align='center', fig.cap='DISTANCIA DE MAHALANOBIS'}
+muestra3 <- rename(muestra3, MAHALANOBIS = muestra3.maha)
+
+ggplot(data = muestra3, map = (aes(y = MAHALANOBIS))) +
+    geom_boxplot(fill = "#457b9d", colour = "#1d3557") +
+    ylab("MAHALANOBIS") +
+  theme_minimal() +
+  theme(axis.title = element_text(color = "#495057"), 
+        plot.title = element_text(color ="#495057"))
+
+```
+
+Tal y como se ha realizado anteriormente, a continuación se va a determinar paramétricamente la existencia de *outliers*.
+Para ello se van a crear los objetos `Q1` (donde se mostrará el valor medio de cada variable en el primer quantil, donde estarán situadas el 25% de las empresas analizadas) y `Q3` (donde se mostrará el valor medio de cada variable en el tercer quantil, donde estarán situadas el 75% de las empresas analizadas) para las distancias de Mahalanobis.
+
+```{r}
+Q1M <- quantile (muestra3$MAHALANOBIS, c(0.25))
+Q3M <- quantile (muestra3$MAHALANOBIS, c(0.75))
+
+```
+
+A continuación, se muestran los *outliers* de las variables analizadas, es decir, las observaciones que presentan valores, para cada una de las variables analizadas, por encima del tercer quantil más 1.5 veces el rango intercualtílico ($Q3 + 1.5·IQR$) y por debajo del primer quantil menos 1.5 veces el rango intercualtílico ($Q1 - 1.5·IQR$).
+Así, tal y como se observa en la Table 9, existen once observaciones que presentan valores atípicos, por lo que estas serán eliminadas para que no influencien los resultados de los análisis posteriores.
+
+```{r}
+knitr::kable(muestra3 %>% 
+               filter(MAHALANOBIS > Q3M + 1.5*IQR(MAHALANOBIS) | 
+                        MAHALANOBIS < Q1M - 1.5*IQR(MAHALANOBIS)) %>% 
+               select(MAHALANOBIS, ENDEUDA, RES, FPIOS, ACTIVO), 
+             caption = "Outliers de las variables ENDEUDA, RES, FPIOS y ACTIVO (incluye distancias de Mahalanobis)") %>% 
+  kableExtra::kable_classic() %>%
+  kable_styling(full_width = F, latex_options = c("basic", "HOLD_position"),
+                "condensed", position = "center", font_size = 8)
+
+```
+
+```{r}
+muestra3_so <- muestra3 %>% filter(MAHALANOBIS <= Q3M + 
+                                     1.5*IQR(MAHALANOBIS) & 
+                                     MAHALANOBIS >= Q1M - 1.5*IQR(MAHALANOBIS))
+
+```
+
+### 5.2. ANÁLISIS DE CORRELACIONES
+
+El último análisis que se va a realizar a las variables elegidas es determinar si estas presentan correlación entre ellas, un análisis que es útil para posteriores procedimientos como puede ser la creación de componentes principales, o para evitar la multicolinealidad en un modelo regresivo.
+
+Generalmente, se dice que dos variables están correlacionadas cuando presentan un índice de Pearson por encima de 0.7 (en valor absoluto), teniendo en cuenta que el índice de correlación toma valores desde -1 hasta 1.
+Significando una correlación negativa entre dos variables que están tienen un comportamiento opuesto y una correlación positiva que ambas variables aumentan o disminuyen al mismo tiempo.
+
+```{r}
+muestra3_so_variables <- muestra3_so %>% 
+  select(ENDEUDA, RES, FPIOS, ACTIVO)
+
+```
+
+Así, tal y como muestra el Figure 7, la variable `ENDEUDA` no presenta correlación elevada con las otras tres, `RES` presenta una elevada correlación positiva con los `FPIOS` y `ACTIVO` (cuando una de las tres aumenta las otras dos también lo hacen, aunque con este estudio no se puede determinar el sentido de la causalidad) y, por último, `FPIOS`, y `ACTIVO` también tiene una elevada correlación positiva, por lo que, por ejemplo, podría resultar apropiado utilizar en ellas técnicas de componentes principales u otros análisis.
+
+```{r, fig.show='asis', fig.align='center', fig.width=20, fig.height=15, fig.cap='Correlaciones'}
+library(PerformanceAnalytics)
+chart.Correlation(muestra3_so_variables, histogram = F, pch = 18)
+
+```
+
+## 6. CONCLUSIONES
+
+De este análisis exploratorio se puede concluir que las empresas eólicas españolas analizadas presentan un elevado ratio de endeudamiento, no existiendo entre ellas ninguna que presente valores atípicamente altos o bajos de esta variable.
+Además, la distribución de estos ratios de endeudamiento no sigue una distribución normal, sino que presenta una asimetría positiva.
+
+Por el contrario, en la variable rentabilidad económica si que existen empresas que presentan valores atípicamente altos, respecto al resto.
+Por último, se puede decir que la variable resultado, fondos propios y activo presentan una alta correlación positiva entre las tres.
+Por el contrario, el ratio de endeudamiento no presenta correlación con ninguna de las otras tres.
+
+\pagebreak
+
+## ANEXO 1. CÓDIGO
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+tidytidy.opts = list(width.cutoff = 30)
+```
